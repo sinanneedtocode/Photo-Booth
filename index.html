@@ -81,7 +81,7 @@
             width: 100%;
             height: 100%;
             object-fit: cover;
-            transform: scaleX(-1); /* Mirror effect */
+            transform: scaleX(-1);
         }
 
         .camera-placeholder {
@@ -304,7 +304,6 @@
             height: 16px;
         }
 
-        /* Icons */
         .icon-heart {
             fill: #ec4899;
         }
@@ -371,7 +370,7 @@
                     Photo Gallery
                 </h2>
                 <div class="gallery-empty" id="gallery-empty">
-                    Nigga, you didnt take any photo!<br>
+                    No photos yet! Take your first picture.
                 </div>
                 <div class="gallery-grid" id="gallery-grid"></div>
             </div>
@@ -436,7 +435,6 @@
                 cameraPlaceholder.style.display = 'none';
                 takePhotoBtn.disabled = false;
                 
-                // Set canvas dimensions to match video
                 video.onloadedmetadata = () => {
                     canvas.width = video.videoWidth;
                     canvas.height = video.videoHeight;
@@ -461,6 +459,7 @@
             countdown = 3;
             countdownEl.textContent = countdown;
             countdownEl.style.display = 'flex';
+            takePhotoBtn.disabled = true;
             
             countdownInterval = setInterval(() => {
                 countdown -= 1;
@@ -468,6 +467,7 @@
                     clearInterval(countdownInterval);
                     countdownEl.style.display = 'none';
                     capturePhoto();
+                    takePhotoBtn.disabled = false;
                 } else {
                     countdownEl.textContent = countdown;
                 }
@@ -478,135 +478,100 @@
             if (!stream) return;
             
             const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
             
-            // Capture the video frame
+            // Apply filter and mirror effect
             ctx.save();
-            ctx.scale(-1, 1); // Mirror horizontally
+            ctx.scale(-1, 1);
+            ctx.filter = currentFilter;
             ctx.drawImage(video, -canvas.width, 0, canvas.width, canvas.height);
             ctx.restore();
-            
-            // Apply the filter
-            if (currentFilter !== 'none') {
-                ctx.filter = currentFilter;
-                const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-                ctx.putImageData(imageData, 0, 0);
-                ctx.filter = 'none';
-            }
             
             // Add polaroid style
             const polaroidImage = addPolaroidFrame(ctx, canvas.width, canvas.height);
             
-            // Add to photos array
             photos.push(polaroidImage);
-            
-            // Update the gallery
             updateGallery();
             
-            // Show gallery if not already visible
             if (!isGalleryVisible) {
                 toggleGallery();
             }
         }
 
         function addPolaroidFrame(ctx, width, height) {
-            // Create polaroid-style frame
-            const originalImageData = ctx.getImageData(0, 0, width, height);
-            
-            // Calculate new dimensions with polaroid border
             const borderWidth = width * 0.08;
-            const bottomBorder = height * 0.18; // Larger bottom border for text
-            
-            // Create new canvas with polaroid dimensions
-            const polaroidCanvas = document.createElement('canvas');
+            const bottomBorder = height * 0.18;
             const polaroidWidth = width + (borderWidth * 2);
             const polaroidHeight = height + borderWidth + bottomBorder;
+            
+            const polaroidCanvas = document.createElement('canvas');
             polaroidCanvas.width = polaroidWidth;
             polaroidCanvas.height = polaroidHeight;
-            
             const polaroidCtx = polaroidCanvas.getContext('2d');
-            
-            // Draw white polaroid background with slight off-white color
+
+            // White background
             polaroidCtx.fillStyle = '#f8f8f5';
             polaroidCtx.fillRect(0, 0, polaroidWidth, polaroidHeight);
             
-            // Add subtle shadow to give 3D effect
-            polaroidCtx.shadowColor = 'rgba(0, 0, 0, 0.2)';
-            polaroidCtx.shadowBlur = 15;
-            polaroidCtx.shadowOffsetX = 0;
-            polaroidCtx.shadowOffsetY = 0;
-            
-            // Create inner rectangle for photo
+            // Main photo area with white border
             polaroidCtx.fillStyle = '#fff';
             polaroidCtx.fillRect(borderWidth - 5, borderWidth - 5, width + 10, height + 10);
             
-            // Reset shadow
-            polaroidCtx.shadowColor = 'transparent';
-            polaroidCtx.shadowBlur = 0;
-            
-            // Draw the original photo in the center of the polaroid
-            polaroidCtx.putImageData(originalImageData, borderWidth, borderWidth);
-            
-            // Add hearts in corners of the photo area
-            polaroidCtx.fillStyle = '#ff69b4';
-            drawHeart(polaroidCtx, borderWidth + 25, borderWidth + 25, 15);
-            drawHeart(polaroidCtx, borderWidth + width - 25, borderWidth + 25, 15);
-            
-            // Add date at the bottom in handwritten style
+            // Draw the photo
+            polaroidCtx.drawImage(
+                canvas, 
+                borderWidth, 
+                borderWidth, 
+                width, 
+                height
+            );
+
+            // Bottom border elements
+            const bottomAreaTop = height + borderWidth;
+            const textY = bottomAreaTop + (bottomBorder * 0.7);
+            const heartY = bottomAreaTop + (bottomBorder * 0.3);
+
+            // Date text
             polaroidCtx.fillStyle = '#555';
             polaroidCtx.font = 'italic 16px cursive';
             const date = new Date().toLocaleDateString();
-            polaroidCtx.fillText(date, polaroidWidth / 2 - 30, polaroidHeight - borderWidth / 2);
-            
-            // Draw a small heart on the bottom border
+            const textWidth = polaroidCtx.measureText(date).width;
+            polaroidCtx.fillText(date, (polaroidWidth - textWidth)/2, textY);
+
+            // Heart icon
             polaroidCtx.fillStyle = '#ff69b4';
-            drawHeart(polaroidCtx, polaroidWidth / 2, polaroidHeight - borderWidth / 1.5, 15);
-            
-            // Optional: Add slightly rotated effect (random slight rotation)
-            const rotation = Math.random() * 10 - 5; // -5 to +5 degrees
-            
-            // Create a bigger canvas to fit the rotated polaroid
+            drawHeart(
+                polaroidCtx, 
+                polaroidWidth/2, 
+                heartY, 
+                15
+            );
+
+            // Rotate effect
+            const rotation = Math.random() * 8 - 4;
             const biggerCanvas = document.createElement('canvas');
             const biggerSize = Math.max(polaroidWidth, polaroidHeight) * 1.5;
             biggerCanvas.width = biggerSize;
             biggerCanvas.height = biggerSize;
-            
             const biggerCtx = biggerCanvas.getContext('2d');
             
-            // Draw rotated polaroid in center of bigger canvas
             biggerCtx.save();
             biggerCtx.translate(biggerSize/2, biggerSize/2);
             biggerCtx.rotate(rotation * Math.PI / 180);
             biggerCtx.drawImage(polaroidCanvas, -polaroidWidth/2, -polaroidHeight/2);
             biggerCtx.restore();
             
-            // Return the final image data URL
             return biggerCanvas.toDataURL('image/png');
         }
 
         function drawHeart(ctx, x, y, size) {
             ctx.save();
             ctx.beginPath();
-            ctx.moveTo(x, y + size / 4);
-            ctx.bezierCurveTo(
-                x, y, 
-                x - size / 2, y, 
-                x - size / 2, y + size / 4
-            );
-            ctx.bezierCurveTo(
-                x - size / 2, y + size / 2, 
-                x, y + size * 3/4, 
-                x, y + size
-            );
-            ctx.bezierCurveTo(
-                x, y + size * 3/4, 
-                x + size / 2, y + size / 2, 
-                x + size / 2, y + size / 4
-            );
-            ctx.bezierCurveTo(
-                x + size / 2, y, 
-                x, y, 
-                x, y + size / 4
-            );
+            ctx.moveTo(x, y + size/4);
+            ctx.bezierCurveTo(x, y, x - size/2, y, x - size/2, y + size/4);
+            ctx.bezierCurveTo(x - size/2, y + size/2, x, y + size*0.75, x, y + size);
+            ctx.bezierCurveTo(x, y + size*0.75, x + size/2, y + size/2, x + size/2, y + size/4);
+            ctx.bezierCurveTo(x + size/2, y, x, y, x, y + size/4);
             ctx.closePath();
             ctx.fill();
             ctx.restore();
